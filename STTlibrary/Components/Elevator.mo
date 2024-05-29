@@ -68,6 +68,15 @@ end ShaftNoCompensation;
       Placement(transformation(origin = {-74, -90}, extent = {{-10, -10}, {10, 10}}), iconTransformation(origin = {-74, -90}, extent = {{-10, -10}, {10, 10}})));
   Modelica.Blocks.Interfaces.RealOutput endRopePosition annotation(
       Placement(transformation(origin = {108, 0}, extent = {{-10, -10}, {10, 10}}), iconTransformation(origin = {86, -70}, extent = {{-10, -10}, {10, 10}})));
+  parameter SI.Length pulleyRadius;
+  parameter SI.MomentOfInertia pulleyInertia;
+  parameter SI.LinearDensity ropeDensity;
+  parameter SI.LinearStrain ropeStrain;
+  parameter SI.Length travelDifferential;
+  parameter SI.Length travelSlack;
+  
+  
+  SI.Angle theta(start =0 ,stateSelect=StateSelect.prefer);
   equation
 
   annotation(
