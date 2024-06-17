@@ -9,11 +9,11 @@ package Elevator
 
     model Simple
     
-      parameter Real radius = 2;
-      parameter Real cambio = 0.8;
-      elevatorHoistway elevatorAssembly(CabinMass = 200, hSlack = 1, deltaH = 20, CounterWeightMass = 200, hStart = 10, pulleyRadius = radius) annotation(
+      parameter Real radius = 4;
+      parameter Real cambio = 0.1;
+      elevatorHoistway elevatorAssembly(CabinMass = 1200, hSlack = 1, deltaH = 20, CounterWeightMass = 1200, hStart = 10, pulleyRadius = radius) annotation(
         Placement(transformation(origin = {44, -16}, extent = {{-46, -46}, {46, 46}})));
-      Motor.ControlledMotor controlledMotor(p = 5, Kt = 10000, R = 0.00005, L = 0.1e-6) annotation(
+      Motor.ControlledMotor controlledMotor(p = 2, Kt = 10000, R = 0.00005, L = 0.1e-6) annotation(
         Placement(transformation(origin = {-110, 14}, extent = {{-10, -10}, {10, 10}})));
     
     genF genF1(riseT = 2.7, raggio = radius/cambio)  annotation(
@@ -261,6 +261,8 @@ end softStart;
   parameter Real raggio;
   parameter Real cambio;
   parameter Real riseT = 2;
+  parameter Real startDec = 9 -riseT;
+  discrete Real a;
   protected
     Modelica.Blocks.Interfaces.RealInput internalM;
   algorithm
@@ -271,8 +273,14 @@ end softStart;
     s := 0;
     elseif  time < riseT then
     s := min(exp( (-1 +  time/riseT)^2/( (-1 +  time/riseT)^2 -1  ) ),1);
-    else 
+    elseif  time > startDec and time < 9 then
+    s := min(exp( (-1 +  (time - startDec + riseT )/riseT)^2/( (-1 +  (time - startDec + riseT )/riseT)^2 -1  ) ),1);
+    a := 1;
+    elseif a > 0 then
+    s := 0;
+    else  
     s := 1;
+    a := 0;
     end if;
   
   end when;
