@@ -23,7 +23,9 @@ model ControlledMotor
     Placement(visible = true, transformation(origin = {100, 0}, extent = {{-10, -10}, {10, 10}}, rotation = 0), iconTransformation(origin = {110, 0}, extent = {{-10, -10}, {10, 10}}, rotation = 0)));
   Modelica.Blocks.Interfaces.RealInput wref annotation (
     Placement(visible = true, transformation(origin = {-100, 48}, extent = {{-20, -20}, {20, 20}}, rotation = 0), iconTransformation(origin = {-100, 0}, extent = {{-20, -20}, {20, 20}}, rotation = 0)));
+  SI.AngularVelocity omega "flange b speed"; 
 equation
+  omega = der(flange_b.phi);
   connect(Vref.OC, Vc.v) annotation (
     Line(points = {{-40, 41}, {-30, 41}, {-30, -6}}, color = {0, 0, 127}));
   connect(Vref.OB, Vb.v) annotation (

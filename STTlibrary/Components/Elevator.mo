@@ -8,31 +8,25 @@ package Elevator
     extends Modelica.Icons.ExamplesPackage;
 
     model Simple
-      elevatorHoistway elevatorAssembly(CabinMass = 1000, hSlack = 1, deltaH = 20, CounterWeightMass = 1200, hStart = 3) annotation(
+    
+      parameter Real radius = 2;
+      parameter Real cambio = 0.8;
+      elevatorHoistway elevatorAssembly(CabinMass = 200, hSlack = 1, deltaH = 20, CounterWeightMass = 200, hStart = 10, pulleyRadius = radius) annotation(
         Placement(transformation(origin = {44, -16}, extent = {{-46, -46}, {46, 46}})));
-      Motor.ControlledMotor controlledMotor(p = 8, Kt = 100) annotation(
-        Placement(transformation(origin = {-60, 12}, extent = {{-10, -10}, {10, 10}})));
-      Modelica.Blocks.Sources.RealExpression speedSetPoint  annotation(
-        Placement(transformation(origin = {-214, 12}, extent = {{-10, -10}, {10, 10}})));
-      discrete Real s;
-    algorithm
+      Motor.ControlledMotor controlledMotor(p = 5, Kt = 10000, R = 0.00005, L = 0.1e-6) annotation(
+        Placement(transformation(origin = {-110, 14}, extent = {{-10, -10}, {10, 10}})));
     
-    when sample(0,0.001) then
-      s := time;
-      if time == 0.0 then
-      s := 0;
-      else
-      s := min(exp( (-1 +  time/2)^2/( (-1 +  time/2)^2 -1  ) ),1);
-      end if;
-     // speedSetPoint.y := 2;
-    end when;
+    genF genF1(riseT = 2.7, raggio = radius/cambio)  annotation(
+        Placement(transformation(origin = {-176, 14}, extent = {{-10, -10}, {10, 10}})));
+    Modelica.Mechanics.Rotational.Components.IdealGear idealGear(ratio = cambio)  annotation(
+        Placement(transformation(origin = {-40, 12}, extent = {{-10, -10}, {10, 10}})));
     equation
-      
-    
-      connect(controlledMotor.wref, speedSetPoint.y) annotation(
-        Line(points = {{-70, 12}, {-203, 12}}, color = {0, 0, 127}));
-      connect(controlledMotor.flange_b, elevatorAssembly.pulleyShaft) annotation(
-        Line(points = {{-48, 12}, {40, 12}}));
+    connect(controlledMotor.wref, genF1.y) annotation(
+        Line(points = {{-120, 14}, {-165, 14}}, color = {0, 0, 127}));
+    connect(controlledMotor.flange_b, idealGear.flange_a) annotation(
+        Line(points = {{-98, 14}, {-50, 14}, {-50, 12}}));
+    connect(idealGear.flange_b, elevatorAssembly.pulleyShaft) annotation(
+        Line(points = {{-30, 12}, {40, 12}}));
       annotation(
         Diagram);
     end Simple;
@@ -83,7 +77,7 @@ package Elevator
       Placement(transformation(origin = {-100, 70}, extent = {{-10, -10}, {10, 10}}), iconTransformation(origin = {-8, 62}, extent = {{-10, -10}, {10, 10}})));
     Modelica.Blocks.Interfaces.RealOutput cabinPosition annotation(
       Placement(transformation(origin = {104, 46}, extent = {{-10, -10}, {10, 10}}), iconTransformation(origin = {46, -72}, extent = {{-18, -18}, {18, 18}})));
-    pulleyAndRope tractionPack(travelDifferential = deltaH, travelSlack = hSlack, cabinStart = hStart, pulleyRadius = pulleyRadius) annotation(
+    pulleyAndRope tractionPack(travelDifferential = deltaH, travelSlack = hSlack, cabinStart = hStart, pulleyRadius = pulleyRadius, pulleyInertia = 24) annotation(
       Placement(transformation(origin = {-4, 64}, extent = {{-24, -24}, {24, 24}})));
     Modelica.Blocks.Discrete.ZeroOrderHold positonSensor(samplePeriod = SamplingTime) annotation(
       Placement(transformation(origin = {68, 48}, extent = {{-10, -10}, {10, 10}})));
@@ -117,9 +111,9 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
       Placement(transformation(origin = {-74, -90}, extent = {{-10, -10}, {10, 10}}), iconTransformation(origin = {-74, -90}, extent = {{-10, -10}, {10, 10}})));
     Modelica.Blocks.Interfaces.RealOutput endRopePosition annotation(
       Placement(transformation(origin = {108, 0}, extent = {{-10, -10}, {10, 10}}), iconTransformation(origin = {86, -70}, extent = {{-10, -10}, {10, 10}})));
-    parameter SI.Length pulleyRadius = 3.550/2;
+    parameter SI.Length pulleyRadius = 3.550;
     parameter SI.Velocity maximumSpeed = 1.1;
-    parameter SI.MomentOfInertia pulleyInertia = 24;
+    parameter SI.MomentOfInertia pulleyInertia = 2;
     parameter SI.LinearDensity ropeDensity = 3 "linear weigth of rope or belt in kg/m , eg 3x BRUbelt 218kN";
     // parameter SI.LinearStrain ropeStrain;
     parameter SI.Length travelDifferential = 20 "distance between lowest and highest floor";
@@ -140,8 +134,8 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     SI.Height shaftHeight = travelDifferential + travelSlack;
     SI.Height cabinPos;
   initial equation
-// cabinPos = cabinStart "Specify initial conditions";
-// traveledDistance = 0;
+  // cabinPos = cabinStart "Specify initial conditions";
+  // traveledDistance = 0;
   equation
     pulleyShaft.phi = theta;
     thetad = der(theta);
@@ -149,12 +143,12 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     speed = thetad*pulleyRadius;
     acc = der(speed);
     lr + cabinPos = shaftHeight;
-    ll + lr = 2*shaftHeight;
+    ll + lr = shaftHeight + travelSlack ;
     ml = ll*ropeDensity;
     mr = lr*ropeDensity;
     traveledDistance = theta*pulleyRadius;
     cabinPos = cabinStart + traveledDistance;
-// torque balance. tau positive ccw
+  // torque balance. tau positive ccw
     pulleyShaft.tau - pulleyInertia*thetadd + pulleyRadius*(g_n*(ml - mr) - acc*(ml + mr) + flange_b.f - flange_a.f) = 0;
     flange_a.s = lr;
     flange_b.s = ll;
@@ -196,6 +190,7 @@ discrete Real speed = 0 "estimated speed";
 discrete Real remainingTravel = 0 "positive up";
 discrete Boolean startBraking = false "positive up";
 discrete Real motorControlNorm = 0 "normalized motor control output var";
+
 protected
   Modelica.Blocks.Interfaces.RealInput internalM;
   Modelica.Blocks.Interfaces.RealInput internalB;
@@ -258,4 +253,35 @@ annotation(
     Diagram,
 Icon(graphics = {Rectangle(fillColor = {255, 255, 255}, fillPattern = FillPattern.Solid, extent = {{-100, 100}, {100, -100}}), Text(origin = {0, -90}, textColor = {0, 0, 255}, extent = {{-82, 12}, {82, -12}}, textString = "%name"), Line(origin = {22.6154, -11.7692}, points = {{-64, 11}, {52, 11}}), Text(origin = {61, 64}, extent = {{-27, 16}, {27, -16}}, textString = "break"), Text(origin = {71, -53}, extent = {{-23, 19}, {23, -19}}, textString = "motor"), Text(origin = {-57, 54}, extent = {{-37, 12}, {37, -12}}, textString = "position"), Line(origin = {19.9869, -4.09}, points = {{-41.9117, -18.9117}, {-21.9117, -14.9117}, {-11.9117, -2.91165}, {0.0883484, 11.0883}, {18.0883, 17.0883}, {34.0883, 19.0883}, {42.0883, 19.0883}}, thickness = 1.25, smooth = Smooth.Bezier)}));
 end softStart;
+
+  block genF
+  Modelica.Blocks.Interfaces.RealOutput y annotation(
+      Placement(transformation(origin = {106, 0}, extent = {{-10, -10}, {10, 10}}), iconTransformation(origin = {106, 0}, extent = {{-10, -10}, {10, 10}})));
+  discrete Real s;
+  parameter Real raggio;
+  parameter Real cambio;
+  parameter Real riseT = 2;
+  protected
+    Modelica.Blocks.Interfaces.RealInput internalM;
+  algorithm
+  
+  when sample(0,1/100) then
+    s := time;
+    if time == 0.0  then
+    s := 0;
+    elseif  time < riseT then
+    s := min(exp( (-1 +  time/riseT)^2/( (-1 +  time/riseT)^2 -1  ) ),1);
+    else 
+    s := 1;
+    end if;
+  
+  end when;
+   
+  equation
+  
+  internalM = s / raggio;
+    connect(y, internalM);
+    
+    
+  end genF;
 end Elevator;
