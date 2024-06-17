@@ -37,20 +37,26 @@ package Elevator
       parameter SI.Velocity nomVel = 1 "m/s nominal speed of the elevator";
       parameter Integer motorPoles;
       parameter SI.Length pulleyRadius = 3.550/2 "radius size of the pulley";
+      parameter Real radius = 4;
+      parameter Real cambio = 0.1;
       // (finalPos - startinPos)/nomVel "supposing instaneous acceleration how much time it will need to reach the target";
       elevatorHoistway elevator(CabinMass = 1800, hSlack = 1, deltaH = 20, CounterWeightMass = 1800, hStart = startinPos, pulleyRadius = pulleyRadius) annotation(
         Placement(transformation(origin = {44, -16}, extent = {{-46, -46}, {46, 46}})));
       Motor.ControlledMotor controlledMotor(p = motorPoles, Kt = 200, R = 0.001) annotation(
-        Placement(transformation(origin = {-76, 18}, extent = {{-10, -10}, {10, 10}})));
+        Placement(transformation(origin = {-88, 8}, extent = {{-10, -10}, {10, 10}})));
     softStart softStarter(radius = pulleyRadius, poles = motorPoles)  annotation(
-        Placement(transformation(origin = {-171, 35}, extent = {{-23, -23}, {23, 23}})));
+        Placement(transformation(origin = {-161, 21}, extent = {{-23, -23}, {23, 23}})));
+  Modelica.Mechanics.Rotational.Components.IdealGear idealGear(ratio = cambio)  annotation(
+        Placement(transformation(origin = {-38, 8}, extent = {{-10, -10}, {10, 10}})));
     equation
       connect(softStarter.motorControl, controlledMotor.wref) annotation(
-        Line(points = {{-146, 22}, {-104, 22}, {-104, 18}, {-86, 18}}, color = {0, 0, 127}));
+        Line(points = {{-136, 8}, {-98, 8}}, color = {0, 0, 127}));
       connect(elevator.cabinPosition, softStarter.positionReading) annotation(
-        Line(points = {{66, -50}, {156, -50}, {156, -96}, {-276, -96}, {-276, 37}, {-191, 37}}, color = {0, 0, 127}));
-  connect(elevator.pulleyShaft, controlledMotor.flange_b) annotation(
-        Line(points = {{40, 12}, {-64, 12}, {-64, 18}}));
+        Line(points = {{66, -50}, {156, -50}, {156, -96}, {-276, -96}, {-276, 23}, {-181, 23}}, color = {0, 0, 127}));
+  connect(controlledMotor.flange_b, idealGear.flange_a) annotation(
+        Line(points = {{-77, 8}, {-48, 8}}));
+  connect(idealGear.flange_b, elevator.pulleyShaft) annotation(
+        Line(points = {{-28, 8}, {13, 8}, {13, 12}, {40, 12}}));
       annotation(
         Diagram);
     end Feedback;
