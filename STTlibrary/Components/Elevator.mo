@@ -34,7 +34,7 @@ package Elevator
         Placement(transformation(origin = {-58, -22}, extent = {{-10, -10}, {10, 10}})));
       Modelica.Mechanics.Rotational.Components.Brake brake(fn_max = 200)  annotation(
         Placement(transformation(origin = {-12, 12}, extent = {{-10, -10}, {10, 10}})));
-      Modelica.Blocks.Sources.RealExpression realExpression annotation(
+      Modelica.Blocks.Sources.RealExpression realExpression(y = 1)  annotation(
         Placement(transformation(origin = {-50, 44}, extent = {{-10, -10}, {10, 10}})));
       Modelica.Blocks.Sources.Ramp ramp1(height = 40000, duration = 1, startTime = 1) annotation(
         Placement(transformation(origin = {-62, 82}, extent = {{-10, -10}, {10, 10}})));
