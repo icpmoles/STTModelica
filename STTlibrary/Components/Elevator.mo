@@ -174,6 +174,105 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
       Icon(graphics = {Ellipse(origin = {-2, 25}, extent = {{-74, 73}, {74, -73}}), Ellipse(origin = {-1, 25}, fillColor = {204, 204, 204}, fillPattern = FillPattern.Sphere, extent = {{-71, 71}, {71, -71}}), Rectangle(origin = {-74, -1}, fillColor = {255, 255, 255}, fillPattern = FillPattern.Forward, extent = {{-2, -19}, {2, 19}}), Rectangle(origin = {70, 3}, fillColor = {255, 255, 255}, fillPattern = FillPattern.Forward, extent = {{2, -21}, {-2, 21}}), Rectangle(origin = {70, -61}, fillColor = {255, 255, 255}, fillPattern = FillPattern.Forward, extent = {{-2, -19}, {2, 19}}), Rectangle(origin = {-72, -63}, fillColor = {255, 255, 255}, fillPattern = FillPattern.Forward, extent = {{-2, -19}, {2, 19}}), Line(origin = {-72.9358, -47.7356}, points = {{-17.9929, -3.69289}, {-13.9929, 4.30711}, {-7.99289, -3.69289}, {0.00710678, 4.30711}, {8.00711, -3.69289}, {14.0071, 4.30711}, {22.0071, -1.69289}}), Line(origin = {70.2785, -44.8785}, points = {{-17.9929, -3.69289}, {-13.9929, 4.30711}, {-7.99289, -3.69289}, {0.00710678, 4.30711}, {8.00711, -3.69289}, {14.0071, 4.30711}, {22.0071, -1.69289}}), Line(origin = {-74.0072, -24.5213}, points = {{-17.9929, -3.69289}, {-13.9929, 4.30711}, {-7.99289, -3.69289}, {0.00710678, 4.30711}, {8.00711, -3.69289}, {14.0071, 4.30711}, {22.0071, -1.69289}}), Line(origin = {70.6356, -21.6642}, points = {{-17.9929, -3.69289}, {-13.9929, 4.30711}, {-7.99289, -3.69289}, {0.00710678, 4.30711}, {8.00711, -3.69289}, {14.0071, 4.30711}, {22.0071, -1.69289}}), Text(origin = {-3, -80}, textColor = {0, 0, 255}, extent = {{-49, 14}, {49, -14}}, textString = "%name")}));
   end pulleyAndRope;
 
+  block ss2
+  type elevatorState = enumeration(
+          starting "elevator receive setpoint",
+          acceleration "elevator reaching nominal speed",
+          cruise "nominal speed",
+          deceleration "elevator reaching 0 speed",
+          stop "zero speed");
+    Modelica.Blocks.Interfaces.RealOutput speed annotation(
+        Placement(transformation(origin = {133, -59}, extent = {{-43, -43}, {43, 43}}), iconTransformation(origin = {132, -54}, extent = {{-30, -30}, {30, 30}})));
+    Modelica.Blocks.Interfaces.RealOutput brakeSignal annotation(
+        Placement(transformation(origin = {145, 37}, extent = {{-53, -53}, {53, 53}}), iconTransformation(origin = {135, 49}, extent = {{-33, -33}, {33, 33}})));
+    Modelica.Blocks.Interfaces.RealInput pos annotation(
+        Placement(transformation(origin = {-117, -3}, extent = {{-55, -55}, {55, 55}}), iconTransformation(origin = {-114, 4}, extent = {{-20, -20}, {20, 20}})));
+    discrete Real s;
+    parameter Real initialPos;
+    parameter Real raggio;
+    parameter Real cambio;
+    parameter Real riseT = 2;
+    parameter Real startDec = 9 - riseT;
+    parameter Real fullDistance = setP - initialPos  "distance it,s supposed to tranverse, positive up "; // = 0;
+    parameter Real setP = 19;
+  //  discrete Real a "acceleration or cruise";
+   discrete Real b "braking";
+    //parameter Real initialPos (fixed = false) "position of start, automaticaly calculated";
+   // discrete Boolean half;
+    
+    elevatorState currentState(start = elevatorState.starting, fixed = true) "sequence current state";
+  protected
+    Modelica.Blocks.Interfaces.RealInput internalMotOut;
+    Modelica.Blocks.Interfaces.RealInput internalBraOut;
+  
+  algorithm
+  
+  when sample(0,1/1000) then
+    /*
+    if abs(pos-initialPos) > abs(fullDistance/2) then
+    half := true; 
+    if (a == 0) then
+    a :=1;
+    end if;
+    
+    else
+    half := false;
+    end if;
+  
+    //s := time;
+    if time == 0.0  then
+    s := 0;
+    elseif  time < riseT then
+    currentState := elevatorState.acceleration;
+    s := min(exp( (-1 +  time/riseT)^2/( (-1 +  time/riseT)^2 -1  ) ),1);
+    elseif  time > startDec and time < 9 then
+    s := min(exp( (-1 +  (time - startDec + riseT )/riseT)^2/( (-1 +  (time - startDec + riseT )/riseT)^2 -1  ) ),1);
+    a := 1;
+    elseif a > 0 then
+       if time > 9 then
+      b := 1;
+      end if;
+    s := 0;
+    else  
+    s := 1;
+    a := 0;
+    end if;
+   */
+   // in accel interval  and "below" the middle point of the travel
+   if  currentState  == elevatorState.starting or  (time < riseT and abs(pos-initialPos) < abs(fullDistance/2)) then
+    currentState := elevatorState.acceleration;
+    
+   end if;
+   
+   if  currentState  == elevatorState.starting then
+   b:=0;
+   s := min(exp( (-1 +  time/riseT)^2/( (-1 +  time/riseT)^2 -1  ) ),1);
+   elseif currentState  == elevatorState.acceleration then
+   elseif currentState  == elevatorState.cruise then
+   elseif currentState  == elevatorState.deceleration then
+   elseif currentState  == elevatorState.stop then
+   end if;
+   
+  end when;
+   
+  equation
+  
+    internalMotOut = s / (raggio/cambio);
+    brakeSignal = b;
+    connect(speed, internalMotOut);
+    connect(brakeSignal, internalBraOut);
+    
+  
+  initial equation
+  
+   // fullDistance =  setP - initialPos;
+  
+  
+  
+  annotation(
+      Icon(graphics = {Rectangle(origin = {-1, -1}, extent = {{-101, 99}, {101, -99}})}));
+end ss2;
+
 block softStart
 
 parameter SI.Length targetPos = 15 "target floor heigth";
@@ -344,80 +443,4 @@ end softStart;
     
     
   end genF;
-
-  block ss2
-  Modelica.Blocks.Interfaces.RealOutput speed annotation(
-      Placement(transformation(origin = {133, -59}, extent = {{-43, -43}, {43, 43}}), iconTransformation(origin = {132, -54}, extent = {{-30, -30}, {30, 30}})));
-  Modelica.Blocks.Interfaces.RealOutput brakeSignal annotation(
-      Placement(transformation(origin = {145, 37}, extent = {{-53, -53}, {53, 53}}), iconTransformation(origin = {135, 49}, extent = {{-33, -33}, {33, 33}})));
-  Modelica.Blocks.Interfaces.RealInput pos annotation(
-      Placement(transformation(origin = {-117, -3}, extent = {{-55, -55}, {55, 55}}), iconTransformation(origin = {-114, 4}, extent = {{-20, -20}, {20, 20}})));
-  discrete Real s;
-  parameter Real initialPos;
-  parameter Real raggio;
-  parameter Real cambio;
-  parameter Real riseT = 2;
-  parameter Real startDec = 9 - riseT;
-  parameter Real fullDistance = setP - initialPos  "distance it,s supposed to tranverse, positive up "; // = 0;
-  parameter Real setP = 19;
-  discrete Real a "acceleration or cruise";
-  discrete Real b "braking";
-  //parameter Real initialPos (fixed = false) "position of start, automaticaly calculated";
-  discrete Boolean half;
-  
-  protected
-    Modelica.Blocks.Interfaces.RealInput internalMotOut;
-    Modelica.Blocks.Interfaces.RealInput internalBraOut;
-  
-  algorithm
-  
-  when sample(0,1/1000) then
-   
-    if abs(pos-initialPos) > abs(fullDistance/2) then
-    half := true; 
-    if (a == 0) then
-    a :=1;
-    end if;
-    
-    else
-    half := false;
-    end if;
-  
-    s := time;
-    if time == 0.0  then
-    s := 0;
-    elseif  time < riseT then
-    s := min(exp( (-1 +  time/riseT)^2/( (-1 +  time/riseT)^2 -1  ) ),1);
-    elseif  time > startDec and time < 9 then
-    s := min(exp( (-1 +  (time - startDec + riseT )/riseT)^2/( (-1 +  (time - startDec + riseT )/riseT)^2 -1  ) ),1);
-    a := 1;
-    elseif a > 0 then
-       if time > 9 then
-      b := 1;
-      end if;
-    s := 0;
-    else  
-    s := 1;
-    a := 0;
-    end if;
-  
-  end when;
-   
-  equation
-  
-    internalMotOut = s / (raggio/cambio);
-    brakeSignal = b;
-    connect(speed, internalMotOut);
-    connect(brakeSignal, internalBraOut);
-    
-  
-  initial equation
-  
-   // fullDistance =  setP - initialPos;
-  
-  
-  
-  annotation(
-      Icon(graphics = {Rectangle(origin = {-1, -1}, extent = {{-101, 99}, {101, -99}})}));
-end ss2;
 end Elevator;
