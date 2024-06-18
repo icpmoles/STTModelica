@@ -33,19 +33,19 @@ package Elevator
 
     model Feedback
       parameter SI.Length startinPos = 2;
-      parameter SI.Length finalPos = 19;
+      parameter SI.Length finalPos = 10;
       parameter SI.Velocity nomVel = 1 "m/s nominal speed of the elevator";
       parameter Integer motorPoles = 1;
       parameter SI.Length pulleyRadius = 5 "radius size of the pulley";
       parameter Real cambio = 0.1;
       // (finalPos - startinPos)/nomVel "supposing instaneous acceleration how much time it will need to reach the target";
-      elevatorHoistway elevator(CabinMass = 2200, hSlack = 1, deltaH = 40, CounterWeightMass = 2200, hStart = 20, pulleyRadius = pulleyRadius) annotation(
+      elevatorHoistway elevator(CabinMass = 2200, hSlack = 1, deltaH = 40, CounterWeightMass = 2200, hStart = startinPos, pulleyRadius = pulleyRadius) annotation(
         Placement(transformation(origin = {44, -16}, extent = {{-46, -46}, {46, 46}})));
       Motor.ControlledMotor controlledMotor(p = motorPoles, Kt = 10000, R = 0.00005, L = 0.1e-6) annotation(
         Placement(transformation(origin = {-88, 8}, extent = {{-10, -10}, {10, 10}})));
       Modelica.Mechanics.Rotational.Components.IdealGear idealGear(ratio = cambio)  annotation(
         Placement(transformation(origin = {-38, 8}, extent = {{-10, -10}, {10, 10}})));
-      ss2 ss21(raggio = pulleyRadius, cambio = cambio)  annotation(
+      ss2 ss21(raggio = pulleyRadius, cambio = cambio, initialPos = startinPos, setP = finalPos)  annotation(
         Placement(transformation(origin = {-158, 14}, extent = {{-10, -10}, {10, 10}})));
       Modelica.Mechanics.Rotational.Components.Brake brake(fn_max = 2000)  annotation(
         Placement(transformation(origin = {4, 10}, extent = {{-10, -10}, {10, 10}})));
@@ -90,7 +90,7 @@ package Elevator
       Placement(transformation(origin = {104, 46}, extent = {{-10, -10}, {10, 10}}), iconTransformation(origin = {46, -72}, extent = {{-18, -18}, {18, 18}})));
     pulleyAndRope tractionPack(travelDifferential = deltaH, travelSlack = hSlack, cabinStart = hStart, pulleyRadius = pulleyRadius, pulleyInertia = 24) annotation(
       Placement(transformation(origin = {-4, 64}, extent = {{-24, -24}, {24, 24}})));
-    Modelica.Blocks.Discrete.ZeroOrderHold positonSensor(samplePeriod = SamplingTime) annotation(
+    Modelica.Blocks.Discrete.ZeroOrderHold positonSensor(samplePeriod = SamplingTime, ySample(fixed = true)) annotation(
       Placement(transformation(origin = {68, 48}, extent = {{-10, -10}, {10, 10}})));
   equation
     connect(gravityCW.flange, CounterWeight.flange_b) annotation(
@@ -353,21 +353,36 @@ end softStart;
   Modelica.Blocks.Interfaces.RealInput pos annotation(
       Placement(transformation(origin = {-117, -3}, extent = {{-55, -55}, {55, 55}}), iconTransformation(origin = {-114, 4}, extent = {{-20, -20}, {20, 20}})));
   discrete Real s;
+  parameter Real initialPos;
   parameter Real raggio;
   parameter Real cambio;
   parameter Real riseT = 2;
-  parameter Real startDec = 9 -riseT;
-  
+  parameter Real startDec = 9 - riseT;
+  parameter Real fullDistance = setP - initialPos  "distance it,s supposed to tranverse, positive up "; // = 0;
   parameter Real setP = 19;
-  discrete Real a;
-  discrete Real b;
+  discrete Real a "acceleration or cruise";
+  discrete Real b "braking";
+  //parameter Real initialPos (fixed = false) "position of start, automaticaly calculated";
+  discrete Boolean half;
+  
   protected
     Modelica.Blocks.Interfaces.RealInput internalMotOut;
     Modelica.Blocks.Interfaces.RealInput internalBraOut;
-    
+  
   algorithm
   
   when sample(0,1/1000) then
+   
+    if abs(pos-initialPos) > abs(fullDistance/2) then
+    half := true; 
+    if (a == 0) then
+    a :=1;
+    end if;
+    
+    else
+    half := false;
+    end if;
+  
     s := time;
     if time == 0.0  then
     s := 0;
@@ -390,10 +405,16 @@ end softStart;
    
   equation
   
-  internalMotOut = s / (raggio/cambio);
-  brakeSignal = b;
-  connect(speed, internalMotOut);
-  connect(brakeSignal, internalBraOut);
+    internalMotOut = s / (raggio/cambio);
+    brakeSignal = b;
+    connect(speed, internalMotOut);
+    connect(brakeSignal, internalBraOut);
+    
+  
+  initial equation
+  
+   // fullDistance =  setP - initialPos;
+  
   
   
   annotation(
