@@ -11,7 +11,7 @@ package Elevator
     
       parameter Real radius = 4;
       parameter Real cambio = 0.1;
-      elevatorHoistway elevatorAssembly(CabinMass = 1200, hSlack = 1, deltaH = 20, CounterWeightMass = 1200, hStart = 10, pulleyRadius = radius) annotation(
+      elevatorHoistway elevatorAssembly(CabinMass = 2200, hSlack = 1, deltaH = 20, CounterWeightMass = 1500, hStart = 10, pulleyRadius = radius) annotation(
         Placement(transformation(origin = {44, -16}, extent = {{-46, -46}, {46, 46}})));
       Motor.ControlledMotor controlledMotor(p = 2, Kt = 10000, R = 0.00005, L = 0.1e-6) annotation(
         Placement(transformation(origin = {-110, 14}, extent = {{-10, -10}, {10, 10}})));
@@ -120,7 +120,8 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     parameter SI.Length pulleyRadius = 3.550;
     parameter SI.Velocity maximumSpeed = 1.1;
     parameter SI.MomentOfInertia pulleyInertia = 2;
-    parameter SI.LinearDensity ropeDensity = 3 "linear weigth of rope or belt in kg/m , eg 3x BRUbelt 218kN";
+    parameter SI.LinearDensity ropeDensity = 3*1.140 "linear weigth of rope or belt in kg/m , eg 3x BRUbelt 218kN";
+    parameter SI.Force ropeStrength = 3*218e3 "breaking load of belt in Newton , eg 3x BRUbelt 218kN";
     // parameter SI.LinearStrain ropeStrain;
     parameter SI.Length travelDifferential = 20 "distance between lowest and highest floor";
     parameter SI.Length travelSlack = 2 "distance between pulley and highest floor";
@@ -160,8 +161,9 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     flange_b.s = ll;
     endRopePosition = cabinPos;
     assert(cabinPos <= travelDifferential, "The cabin went too high", AssertionLevel.warning);
+    assert(abs(flange_a.s) <= travelDifferential, "The cabin went too high", AssertionLevel.warning);
     assert(0 <= cabinPos, "The cabin went too low", AssertionLevel.warning);
-    assert(abs(speed) < maximumSpeed, "The cabin is too fast", AssertionLevel.warning);
+    assert(abs(flange_b.f) < ropeStrength, "The belt just failed", AssertionLevel.warning);
     annotation(
       Diagram,
       Icon(graphics = {Ellipse(origin = {-2, 25}, extent = {{-74, 73}, {74, -73}}), Ellipse(origin = {-1, 25}, fillColor = {204, 204, 204}, fillPattern = FillPattern.Sphere, extent = {{-71, 71}, {71, -71}}), Rectangle(origin = {-74, -1}, fillColor = {255, 255, 255}, fillPattern = FillPattern.Forward, extent = {{-2, -19}, {2, 19}}), Rectangle(origin = {70, 3}, fillColor = {255, 255, 255}, fillPattern = FillPattern.Forward, extent = {{2, -21}, {-2, 21}}), Rectangle(origin = {70, -61}, fillColor = {255, 255, 255}, fillPattern = FillPattern.Forward, extent = {{-2, -19}, {2, 19}}), Rectangle(origin = {-72, -63}, fillColor = {255, 255, 255}, fillPattern = FillPattern.Forward, extent = {{-2, -19}, {2, 19}}), Line(origin = {-72.9358, -47.7356}, points = {{-17.9929, -3.69289}, {-13.9929, 4.30711}, {-7.99289, -3.69289}, {0.00710678, 4.30711}, {8.00711, -3.69289}, {14.0071, 4.30711}, {22.0071, -1.69289}}), Line(origin = {70.2785, -44.8785}, points = {{-17.9929, -3.69289}, {-13.9929, 4.30711}, {-7.99289, -3.69289}, {0.00710678, 4.30711}, {8.00711, -3.69289}, {14.0071, 4.30711}, {22.0071, -1.69289}}), Line(origin = {-74.0072, -24.5213}, points = {{-17.9929, -3.69289}, {-13.9929, 4.30711}, {-7.99289, -3.69289}, {0.00710678, 4.30711}, {8.00711, -3.69289}, {14.0071, 4.30711}, {22.0071, -1.69289}}), Line(origin = {70.6356, -21.6642}, points = {{-17.9929, -3.69289}, {-13.9929, 4.30711}, {-7.99289, -3.69289}, {0.00710678, 4.30711}, {8.00711, -3.69289}, {14.0071, 4.30711}, {22.0071, -1.69289}}), Text(origin = {-3, -80}, textColor = {0, 0, 255}, extent = {{-49, 14}, {49, -14}}, textString = "%name")}));
