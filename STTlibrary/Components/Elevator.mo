@@ -16,9 +16,9 @@ package Elevator
       Motor.ControlledMotor controlledMotor(p = 2, Kt = 10000, R = 0.00005, L = 0.1e-6) annotation(
         Placement(transformation(origin = {-110, 14}, extent = {{-10, -10}, {10, 10}})));
     
-    genF genF1(riseT = 2.7, raggio = radius/cambio)  annotation(
+      genF genF1(riseT = 2.7, raggio = radius/cambio)  annotation(
         Placement(transformation(origin = {-176, 14}, extent = {{-10, -10}, {10, 10}})));
-    Modelica.Mechanics.Rotational.Components.IdealGear idealGear(ratio = cambio)  annotation(
+      Modelica.Mechanics.Rotational.Components.IdealGear idealGear(ratio = cambio)  annotation(
         Placement(transformation(origin = {-40, 12}, extent = {{-10, -10}, {10, 10}})));
     equation
     connect(controlledMotor.wref, genF1.y) annotation(
@@ -35,28 +35,33 @@ package Elevator
       parameter SI.Length startinPos = 2;
       parameter SI.Length finalPos = 19;
       parameter SI.Velocity nomVel = 1 "m/s nominal speed of the elevator";
-      parameter Integer motorPoles;
-      parameter SI.Length pulleyRadius = 3.550/2 "radius size of the pulley";
-      parameter Real radius = 4;
+      parameter Integer motorPoles = 1;
+      parameter SI.Length pulleyRadius = 5 "radius size of the pulley";
       parameter Real cambio = 0.1;
       // (finalPos - startinPos)/nomVel "supposing instaneous acceleration how much time it will need to reach the target";
-      elevatorHoistway elevator(CabinMass = 1800, hSlack = 1, deltaH = 20, CounterWeightMass = 1800, hStart = startinPos, pulleyRadius = pulleyRadius) annotation(
+      elevatorHoistway elevator(CabinMass = 2200, hSlack = 1, deltaH = 40, CounterWeightMass = 2200, hStart = 20, pulleyRadius = pulleyRadius) annotation(
         Placement(transformation(origin = {44, -16}, extent = {{-46, -46}, {46, 46}})));
-      Motor.ControlledMotor controlledMotor(p = motorPoles, Kt = 200, R = 0.001) annotation(
+      Motor.ControlledMotor controlledMotor(p = motorPoles, Kt = 10000, R = 0.00005, L = 0.1e-6) annotation(
         Placement(transformation(origin = {-88, 8}, extent = {{-10, -10}, {10, 10}})));
-    softStart softStarter(radius = pulleyRadius, poles = motorPoles)  annotation(
-        Placement(transformation(origin = {-161, 21}, extent = {{-23, -23}, {23, 23}})));
-  Modelica.Mechanics.Rotational.Components.IdealGear idealGear(ratio = cambio)  annotation(
+      Modelica.Mechanics.Rotational.Components.IdealGear idealGear(ratio = cambio)  annotation(
         Placement(transformation(origin = {-38, 8}, extent = {{-10, -10}, {10, 10}})));
+      ss2 ss21(raggio = pulleyRadius, cambio = cambio)  annotation(
+        Placement(transformation(origin = {-158, 14}, extent = {{-10, -10}, {10, 10}})));
+      Modelica.Mechanics.Rotational.Components.Brake brake(fn_max = 2000)  annotation(
+        Placement(transformation(origin = {4, 10}, extent = {{-10, -10}, {10, 10}})));
     equation
-      connect(softStarter.motorControl, controlledMotor.wref) annotation(
-        Line(points = {{-136, 8}, {-98, 8}}, color = {0, 0, 127}));
-      connect(elevator.cabinPosition, softStarter.positionReading) annotation(
-        Line(points = {{66, -50}, {156, -50}, {156, -96}, {-276, -96}, {-276, 23}, {-181, 23}}, color = {0, 0, 127}));
-  connect(controlledMotor.flange_b, idealGear.flange_a) annotation(
+      connect(controlledMotor.flange_b, idealGear.flange_a) annotation(
         Line(points = {{-77, 8}, {-48, 8}}));
-  connect(idealGear.flange_b, elevator.pulleyShaft) annotation(
-        Line(points = {{-28, 8}, {13, 8}, {13, 12}, {40, 12}}));
+  connect(controlledMotor.wref, ss21.speed) annotation(
+        Line(points = {{-98, 8}, {-145, 8}, {-145, 9}}, color = {0, 0, 127}));
+  connect(ss21.pos, elevator.cabinPosition) annotation(
+        Line(points = {{-169, 14}, {-192, 14}, {-192, -86}, {130, -86}, {130, -50}, {66, -50}}, color = {0, 0, 127}));
+  connect(idealGear.flange_b, brake.flange_a) annotation(
+        Line(points = {{-28, 8}, {-6, 8}, {-6, 10}}));
+  connect(brake.flange_b, elevator.pulleyShaft) annotation(
+        Line(points = {{14, 10}, {40, 10}, {40, 12}}));
+  connect(brake.f_normalized, ss21.brakeSignal) annotation(
+        Line(points = {{4, 22}, {-144, 22}, {-144, 18}}, color = {0, 0, 127}));
       annotation(
         Diagram);
     end Feedback;
@@ -177,11 +182,11 @@ parameter SI.Time deltaAcc = 1 "how long the acceleration curve takes";
 parameter SI.Time deltaDec = 0.5 "how long the deceleration curve takes";
 parameter SI.Velocity vn = 1 "nominal speed m/s, our target";
 parameter SI.Length resolution = 1e-3 "1mm of resolution for the encoder";
-parameter Real sampleTime = 100e-5 "4kHz seems reasonable for sensor controller transmission";
+parameter Real sampleTime = 100e-3 "4kHz seems reasonable for sensor controller transmission";
 parameter SI.Length holdingDistance = 0.005 "distance of acceptable target precision";
 parameter SI.Length radius "pulley radius";
 parameter Integer poles "motor poles";
-
+final parameter Real normDistance = 0.6034501612189380 "integral(speed) for 1s of acceleration time";
 // I/O
 Modelica.Blocks.Interfaces.RealInput positionReading annotation(
     Placement(transformation(origin = {-101, -53}, extent = {{-27, -27}, {27, 27}}), iconTransformation(origin = {-88, 8}, extent = {{-20, -20}, {20, 20}})));
@@ -191,19 +196,26 @@ Modelica.Blocks.Interfaces.RealOutput motorControl annotation(
     Placement(transformation(origin = {120, -50}, extent = {{-20, -20}, {20, 20}}), iconTransformation(origin = {108, -56}, extent = {{-10, -10}, {10, 10}})));
 
 // algo vars
-discrete Real deltaTime = 0 "interrupt interval";
-discrete Real preTime = 0 "time at previos sampling";
-discrete Real deltaS = 0 "change of heigth between sampling";
+discrete Real startingPos = -1 "heigth of start, -1 is initialized";
+
+//discrete Real deltaTime = 0 "interrupt interval";
+//discrete Real preTime = 0 "time at previos sampling";
+//discrete Real deltaS = 0 "change of heigth between sampling";
 discrete Real speed = 0 "estimated speed";
-discrete Real remainingTravel = 0 "positive up";
-discrete Boolean startBraking = false "positive up";
-discrete Real motorControlNorm = 0 "normalized motor control output var";
+//discrete Real remainingTravel = 0 "positive up";
+discrete Boolean startBraking = false "";
+discrete Boolean startSlowing = false "";
+//discrete Real motorControlNorm = 0 "normalized motor control output var";
+//discrete Real s;
+discrete Boolean decStarted = false;
+discrete Real startDec "time instant of start of decelleration";
+
 
 protected
   Modelica.Blocks.Interfaces.RealInput internalM;
   Modelica.Blocks.Interfaces.RealInput internalB;
 algorithm
-
+/*
 // when change(positionReading) then
 when sample(0,sampleTime) then
 
@@ -250,16 +262,44 @@ end if;
 
 internalM := vn * motorControlNorm / radius ;
 end when;
+*/
 
 
+when sample(0,sampleTime) then
+  if startingPos == -1 then
+  startingPos := positionReading;
+  end if;
 
+  if time == 0.0  then
+    speed := 0;
+  elseif  time < deltaAcc then
+    speed := min(exp( (-1 +  time/deltaAcc)^2/( (-1 +  time/deltaAcc)^2 -1  ) ),1);
+  elseif  abs(positionReading-targetPos)<deltaAcc*normDistance or  abs(positionReading-targetPos)<abs(startingPos-targetPos)/2   then
+// if we start the deceleration routine we center the shape function in this time instant
+    if decStarted == false then
+      startDec := time;
+      decStarted := true;
+    end if;
+  
+    speed := min(exp( (-1 +  (time - startDec + deltaAcc )/deltaAcc)^2/( (-1 +  (time - startDec + deltaAcc )/deltaAcc)^2 -1  ) ),1);
+    startSlowing := true;
+  elseif startSlowing then
+    speed := 0;
+  else  
+    speed := 1;
+    startSlowing := false;
+  end if;
+
+end when;
 equation
+internalB = 1;
+internalM = speed / radius;
 connect(motorControl,internalM);
 connect(brakingOutput,internalB);
 
 annotation(
     Diagram,
-Icon(graphics = {Rectangle(fillColor = {255, 255, 255}, fillPattern = FillPattern.Solid, extent = {{-100, 100}, {100, -100}}), Text(origin = {0, -90}, textColor = {0, 0, 255}, extent = {{-82, 12}, {82, -12}}, textString = "%name"), Line(origin = {22.6154, -11.7692}, points = {{-64, 11}, {52, 11}}), Text(origin = {61, 64}, extent = {{-27, 16}, {27, -16}}, textString = "break"), Text(origin = {71, -53}, extent = {{-23, 19}, {23, -19}}, textString = "motor"), Text(origin = {-57, 54}, extent = {{-37, 12}, {37, -12}}, textString = "position"), Line(origin = {19.9869, -4.09}, points = {{-41.9117, -18.9117}, {-21.9117, -14.9117}, {-11.9117, -2.91165}, {0.0883484, 11.0883}, {18.0883, 17.0883}, {34.0883, 19.0883}, {42.0883, 19.0883}}, thickness = 1.25, smooth = Smooth.Bezier)}));
+Icon(graphics = {Rectangle(fillColor = {255, 255, 255}, fillPattern = FillPattern.Solid, extent = {{-100, 100}, {100, -100}}), Text(origin = {0, -90}, textColor = {0, 0, 255}, extent = {{-82, 12}, {82, -12}}, textString = "%name"), Line(origin = {22.6154, -11.7692}, points = {{-64, 11}, {52, 11}}), Text(origin = {61, 64}, extent = {{-27, 16}, {27, -16}}, textString = "brake"), Text(origin = {71, -53}, extent = {{-23, 19}, {23, -19}}, textString = "motor"), Text(origin = {-57, 54}, extent = {{-37, 12}, {37, -12}}, textString = "position"), Line(origin = {19.9869, -4.09}, points = {{-41.9117, -18.9117}, {-21.9117, -14.9117}, {-11.9117, -2.91165}, {0.0883484, 11.0883}, {18.0883, 17.0883}, {34.0883, 19.0883}, {42.0883, 19.0883}}, thickness = 1.25, smooth = Smooth.Bezier)}));
 end softStart;
 
   block genF
@@ -270,7 +310,10 @@ end softStart;
   parameter Real cambio;
   parameter Real riseT = 2;
   parameter Real startDec = 9 -riseT;
+  
+  parameter Real setP = 19;
   discrete Real a;
+  
   protected
     Modelica.Blocks.Interfaces.RealInput internalM;
   algorithm
@@ -285,6 +328,58 @@ end softStart;
     s := min(exp( (-1 +  (time - startDec + riseT )/riseT)^2/( (-1 +  (time - startDec + riseT )/riseT)^2 -1  ) ),1);
     a := 1;
     elseif a > 0 then
+   
+    s := 0;
+    else  // cruising
+    s := 1;
+    a := 0;
+    end if;
+  
+  end when;
+   
+  equation
+  
+  internalM = s / raggio;
+  connect(y, internalM);
+    
+    
+  end genF;
+
+  block ss2
+  Modelica.Blocks.Interfaces.RealOutput speed annotation(
+      Placement(transformation(origin = {133, -59}, extent = {{-43, -43}, {43, 43}}), iconTransformation(origin = {132, -54}, extent = {{-30, -30}, {30, 30}})));
+  Modelica.Blocks.Interfaces.RealOutput brakeSignal annotation(
+      Placement(transformation(origin = {145, 37}, extent = {{-53, -53}, {53, 53}}), iconTransformation(origin = {135, 49}, extent = {{-33, -33}, {33, 33}})));
+  Modelica.Blocks.Interfaces.RealInput pos annotation(
+      Placement(transformation(origin = {-117, -3}, extent = {{-55, -55}, {55, 55}}), iconTransformation(origin = {-114, 4}, extent = {{-20, -20}, {20, 20}})));
+  discrete Real s;
+  parameter Real raggio;
+  parameter Real cambio;
+  parameter Real riseT = 2;
+  parameter Real startDec = 9 -riseT;
+  
+  parameter Real setP = 19;
+  discrete Real a;
+  discrete Real b;
+  protected
+    Modelica.Blocks.Interfaces.RealInput internalMotOut;
+    Modelica.Blocks.Interfaces.RealInput internalBraOut;
+    
+  algorithm
+  
+  when sample(0,1/1000) then
+    s := time;
+    if time == 0.0  then
+    s := 0;
+    elseif  time < riseT then
+    s := min(exp( (-1 +  time/riseT)^2/( (-1 +  time/riseT)^2 -1  ) ),1);
+    elseif  time > startDec and time < 9 then
+    s := min(exp( (-1 +  (time - startDec + riseT )/riseT)^2/( (-1 +  (time - startDec + riseT )/riseT)^2 -1  ) ),1);
+    a := 1;
+    elseif a > 0 then
+       if time > 9 then
+      b := 1;
+      end if;
     s := 0;
     else  
     s := 1;
@@ -295,9 +390,13 @@ end softStart;
    
   equation
   
-  internalM = s / raggio;
-    connect(y, internalM);
-    
-    
-  end genF;
+  internalMotOut = s / (raggio/cambio);
+  brakeSignal = b;
+  connect(speed, internalMotOut);
+  connect(brakeSignal, internalBraOut);
+  
+  
+  annotation(
+      Icon(graphics = {Rectangle(origin = {-1, -1}, extent = {{-101, 99}, {101, -99}})}));
+end ss2;
 end Elevator;
