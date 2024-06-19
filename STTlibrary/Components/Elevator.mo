@@ -32,8 +32,8 @@ package Elevator
     end Simple;
 
     model Feedback
-      parameter SI.Length startinPos = 5;
-      parameter SI.Length finalPos = 6;
+      parameter SI.Length startinPos = 4;
+      parameter SI.Length finalPos = 10;
       parameter SI.Velocity nomVel = 1 "m/s nominal speed of the elevator";
       parameter Integer motorPoles = 1;
       parameter SI.Length pulleyRadius = 5 "radius size of the pulley";
@@ -204,6 +204,11 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     //parameter Real initialPos (fixed = false) "position of start, automaticaly calculated";
     // discrete Boolean half;
     elevatorState currentState(start = elevatorState.starting, fixed = true) "sequence current state";
+    discrete Real brakingHeightStart (start=-1) "-1 = not set";
+    discrete Real brakingTimeStart (start=-1) "-1 = not set";
+    discrete Real speedMagnitude (start=1) "1 = default";
+    discrete Real virtualBrakingStart  "0 = default";
+    
   protected
     Modelica.Blocks.Interfaces.RealInput internalMotOut;
     Modelica.Blocks.Interfaces.RealInput internalBraOut;
@@ -222,7 +227,22 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     end if;
     
     if (currentState == elevatorState.cruise and abs(pos-setP) <= decelerationDistance) or (currentState == elevatorState.acceleration and abs(pos-initialPos) >= abs(fullDistance/2))  then
+    
     currentState := elevatorState.deceleration;
+    if brakingHeightStart == -1 then
+    brakingHeightStart := pos;
+    brakingTimeStart := time;
+    speedMagnitude := pre(s);
+    if speedMagnitude ==1 then
+     virtualBrakingStart :=brakingTimeStart ;
+    else
+      virtualBrakingStart :=2*brakingTimeStart -riseT;
+    end if;
+    end if;
+    end if;
+    
+    if (currentState == elevatorState.deceleration and abs(pos-setP) <= 0.002) then
+    currentState := elevatorState.stop;
     end if;
     
    
@@ -235,14 +255,18 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     b:=0;
    s := 1;
    elseif currentState  == elevatorState.deceleration then
+   //s := speedMagnitude * min(exp( (-1 +  (time-(riseT-brakingTimeStart) +(riseT*speedMagnitude))/(riseT*speedMagnitude) )^2/( (-1 +  (time-(riseT-brakingTimeStart) +(riseT*speedMagnitude))/(riseT*speedMagnitude))^2 -1  ) ),1);
+    s := min(exp( ( -1 +  (time-virtualBrakingStart+riseT)/riseT)^2/( (-1 +  (time-virtualBrakingStart+riseT)/riseT)^2 -1  ) ),1);
    elseif currentState  == elevatorState.stop then
+   s := 0;
+   b:=1;
    end if;
    
   end when;
    
   equation
   
-    internalMotOut = direction * s / (raggio/cambio);
+    internalMotOut =  direction * s / (raggio/cambio);
     brakeSignal = b;
     connect(speed, internalMotOut);
     connect(brakeSignal, internalBraOut);
