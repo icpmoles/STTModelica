@@ -38,7 +38,6 @@ package Elevator
       parameter Integer motorPoles = 1;
       parameter SI.Length pulleyRadius = 5 "radius size of the pulley";
       parameter Real cambio = 0.1;
-      // (finalPos - startinPos)/nomVel "supposing instaneous acceleration how much time it will need to reach the target";
       elevatorHoistway elevator(CabinMass = 2200, hSlack = 1, deltaH = 40, CounterWeightMass = 2200, hStart = startinPos, pulleyRadius = pulleyRadius) annotation(
         Placement(transformation(origin = {44, -16}, extent = {{-46, -46}, {46, 46}})));
       Motor.ControlledMotor controlledMotor(p = motorPoles, Kt = 10000, R = 0.00005, L = 0.1e-6) annotation(
@@ -128,11 +127,9 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     parameter SI.MomentOfInertia pulleyInertia = 2;
     parameter SI.LinearDensity ropeDensity = 3*1.140 "linear weigth of rope or belt in kg/m , eg 3x BRUbelt 218kN";
     parameter SI.Force ropeStrength = 3*218e3 "breaking load of belt in Newton , eg 3x BRUbelt 218kN";
-    // parameter SI.LinearStrain ropeStrain;
     parameter SI.Length travelDifferential = 20 "distance between lowest and highest floor";
     parameter SI.Length travelSlack = 2 "distance between pulley and highest floor";
     parameter SI.Height cabinStart = 0 "starting Position of the Cabin";
-    // angle pulley(start = 0, stateSelect = StateSelect.prefer)
     SI.Angle theta(stateSelect = StateSelect.prefer);
     SI.AngularVelocity thetad(start = 0);
     SI.AngularAcceleration thetadd(start = 0);
@@ -146,9 +143,7 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     SI.Length traveledDistance "distance traveled by the cabin, positive up";
     SI.Height shaftHeight = travelDifferential + travelSlack;
     SI.Height cabinPos;
-  initial equation
-// cabinPos = cabinStart "Specify initial conditions";
-// traveledDistance = 0;
+
   equation
     pulleyShaft.phi = theta;
     thetad = der(theta);
@@ -161,7 +156,6 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     mr = lr*ropeDensity;
     traveledDistance = theta*pulleyRadius;
     cabinPos = cabinStart + traveledDistance;
-// torque balance. tau positive ccw
     pulleyShaft.tau - pulleyInertia*thetadd + pulleyRadius*(g_n*(ml - mr) - acc*(ml + mr) + flange_b.f - flange_a.f) = 0;
     flange_a.s = lr;
     flange_b.s = ll;
@@ -188,27 +182,30 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
         Placement(transformation(origin = {145, 37}, extent = {{-53, -53}, {53, 53}}), iconTransformation(origin = {135, 49}, extent = {{-33, -33}, {33, 33}})));
     Modelica.Blocks.Interfaces.RealInput pos annotation(
         Placement(transformation(origin = {-117, -3}, extent = {{-55, -55}, {55, 55}}), iconTransformation(origin = {-114, 4}, extent = {{-20, -20}, {20, 20}})));
-    discrete Real s;
-    parameter Real initialPos;
-    parameter Real raggio;
+    //parameters
+    parameter SI.Height initialPos;
+    parameter SI.Length raggio;
     parameter Real cambio;
-    parameter Real riseT = 2;
-    parameter Real startDec = 9 - riseT;
-    parameter Real fullDistance = setP - initialPos  "distance it,s supposed to tranverse, positive up "; // = 0;
-    parameter Real setP = 19;
-    final parameter Real normDistance = 0.6034501612189380 "integral(speed) for 1s of acceleration time";
-     Real decelerationDistance = normDistance * riseT;
-    final parameter Integer direction (start= sign(setP-initialPos),fixed=true  )  "postive=up, ccw";
-  //  discrete Real a "acceleration or cruise";
-   discrete Real b "braking";
-    //parameter Real initialPos (fixed = false) "position of start, automaticaly calculated";
-    // discrete Boolean half;
-    elevatorState currentState(start = elevatorState.starting, fixed = true) "sequence current state";
-    discrete Real brakingHeightStart (start=-1) "-1 = not set";
-    discrete Real brakingTimeStart (start=-1) "-1 = not set";
+    parameter SI.Time riseT = 2;
+    parameter SI.Time startDec = 9 - riseT;
+    parameter SI.Length fullDistance = setP - initialPos  "distance it,s supposed to tranverse, positive up "; // = 0;
+    parameter SI.Height setP = 19;
+    parameter SI.Length goalBound = 0.002;
+    parameter SI.Time brakingTime = 0.5 "-1 = not set"; 
+//discrete vars
+    discrete Real s;
+    discrete Real b "braking";
+    discrete Real decelHeightStart (start=-1) "-1 = not set";
+    discrete Real decelTimeStart (start=-1) "-1 = not set";
     discrete Real speedMagnitude (start=1) "1 = default";
-    discrete Real virtualBrakingStart  "0 = default";
-    
+    discrete Real virtualDecelStart  "0 = default";
+    elevatorState currentState(start = elevatorState.starting, fixed = true) "sequence current state";
+    discrete Real brakingTimeStart (start=-1) "-1 = not set";
+    //misc
+    final parameter Real normDistance = 0.6034501612189380 "integral(speed) for 1s of acceleration time";
+    Real decelerationDistance = normDistance * riseT;
+    final parameter Integer direction (start= sign(setP-initialPos),fixed=true  )  "postive=up, ccw";
+  
   protected
     Modelica.Blocks.Interfaces.RealInput internalMotOut;
     Modelica.Blocks.Interfaces.RealInput internalBraOut;
@@ -229,20 +226,23 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     if (currentState == elevatorState.cruise and abs(pos-setP) <= decelerationDistance) or (currentState == elevatorState.acceleration and abs(pos-initialPos) >= abs(fullDistance/2))  then
     
     currentState := elevatorState.deceleration;
-    if brakingHeightStart == -1 then
-    brakingHeightStart := pos;
-    brakingTimeStart := time;
+    if decelHeightStart == -1 then
+    decelHeightStart := pos;
+    decelTimeStart := time;
     speedMagnitude := pre(s);
     if speedMagnitude ==1 then
-     virtualBrakingStart :=brakingTimeStart ;
+     virtualDecelStart := decelTimeStart ;
     else
-      virtualBrakingStart :=2*brakingTimeStart -riseT;
+      virtualDecelStart :=2*decelTimeStart -riseT;
     end if;
     end if;
     end if;
     
-    if (currentState == elevatorState.deceleration and abs(pos-setP) <= 0.002) then
+    if (currentState == elevatorState.deceleration and abs(pos-setP) <= goalBound) then
     currentState := elevatorState.stop;
+    if b == 0 then
+    brakingTimeStart := time;
+    end if;
     end if;
     
    
@@ -255,11 +255,10 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     b:=0;
    s := 1;
    elseif currentState  == elevatorState.deceleration then
-   //s := speedMagnitude * min(exp( (-1 +  (time-(riseT-brakingTimeStart) +(riseT*speedMagnitude))/(riseT*speedMagnitude) )^2/( (-1 +  (time-(riseT-brakingTimeStart) +(riseT*speedMagnitude))/(riseT*speedMagnitude))^2 -1  ) ),1);
-    s := min(exp( ( -1 +  (time-virtualBrakingStart+riseT)/riseT)^2/( (-1 +  (time-virtualBrakingStart+riseT)/riseT)^2 -1  ) ),1);
+   s := min(exp( ( -1 +  (time-virtualDecelStart+riseT)/riseT)^2/( (-1 +  (time-virtualDecelStart+riseT)/riseT)^2 -1  ) ),1);
    elseif currentState  == elevatorState.stop then
    s := 0;
-   b:=1;
+   b:=min((time-brakingTimeStart)/brakingTime,1);
    end if;
    
   end when;
@@ -271,140 +270,9 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
     connect(speed, internalMotOut);
     connect(brakeSignal, internalBraOut);
     
-  
-  initial equation
-  // fullDistance =  setP - initialPos;
   annotation(
       Icon(graphics = {Rectangle(origin = {-1, -1}, extent = {{-101, 99}, {101, -99}})}));
   end ss2;
-
-block softStart
-
-parameter SI.Length targetPos = 15 "target floor heigth";
-parameter SI.Length decDistance = 1 "how soon should it start the decelleration routine";
-parameter SI.Time deltaAcc = 1 "how long the acceleration curve takes";
-parameter SI.Time deltaDec = 0.5 "how long the deceleration curve takes";
-parameter SI.Velocity vn = 1 "nominal speed m/s, our target";
-parameter SI.Length resolution = 1e-3 "1mm of resolution for the encoder";
-parameter Real sampleTime = 100e-3 "4kHz seems reasonable for sensor controller transmission";
-parameter SI.Length holdingDistance = 0.005 "distance of acceptable target precision";
-parameter SI.Length radius "pulley radius";
-parameter Integer poles "motor poles";
-final parameter Real normDistance = 0.6034501612189380 "integral(speed) for 1s of acceleration time";
-  // I/O
-    Modelica.Blocks.Interfaces.RealInput positionReading annotation(
-    Placement(transformation(origin = {-101, -53}, extent = {{-27, -27}, {27, 27}}), iconTransformation(origin = {-88, 8}, extent = {{-20, -20}, {20, 20}})));
-Modelica.Blocks.Interfaces.RealOutput brakingOutput annotation(
-    Placement(transformation(origin = {116, 60}, extent = {{-16, -16}, {16, 16}}), iconTransformation(origin = {102, 56}, extent = {{-10, -10}, {10, 10}})));
-Modelica.Blocks.Interfaces.RealOutput motorControl annotation(
-    Placement(transformation(origin = {120, -50}, extent = {{-20, -20}, {20, 20}}), iconTransformation(origin = {108, -56}, extent = {{-10, -10}, {10, 10}})));
-
-// algo vars
-    discrete Real startingPos = -1 "heigth of start, -1 is initialized";
-
-//discrete Real deltaTime = 0 "interrupt interval";
-    //discrete Real preTime = 0 "time at previos sampling";
-    //discrete Real deltaS = 0 "change of heigth between sampling";
-    discrete Real speed = 0 "estimated speed";
-  //discrete Real remainingTravel = 0 "positive up";
-    discrete Boolean startBraking = false "";
-discrete Boolean startSlowing = false "";
-  //discrete Real motorControlNorm = 0 "normalized motor control output var";
-    //discrete Real s;
-    discrete Boolean decStarted = false;
-discrete Real startDec "time instant of start of decelleration";
-
-
-protected
-  Modelica.Blocks.Interfaces.RealInput internalM;
-  Modelica.Blocks.Interfaces.RealInput internalB;
-algorithm
-/*
-// when change(positionReading) then
-when sample(0,sampleTime) then
-
-// acquire variables
-deltaTime := time - preTime;
-preTime := time;
-deltaS := positionReading - pre(positionReading);
-remainingTravel := targetPos - positionReading;
-
-// calculate speed
-if abs(deltaS) < resolution or (deltaTime<1e-10) then 
-speed := 0; //just assume that we are stopped or at start
-else 
-speed := deltaS/deltaTime;
-end if;
-
-// if close enough start braking
-if abs(remainingTravel)<holdingDistance*5 then
-startBraking := true;
-end if;
-
-
-//braking logic:
-if time<0.2 or startBraking then // slightly brake at the start (to avoid cabin from moving while motor starts) and near the target
-brakingOutput := 0.8;
-  if abs(remainingTravel)<holdingDistance then // near the target e can brake fully
-  brakingOutput := 1.0;
-  end if;
-else
-brakingOutput := 0.0;
-end if;
-
-
-
-//soft start
-if time<deltaAcc then
-motorControlNorm := exp( (-1 +  time/deltaAcc)^2/( (-1 +  time/deltaAcc)^2 -1  ) );
-else 
-motorControlNorm := 1;
-end if;
-
-
-
-
-internalM := vn * motorControlNorm / radius ;
-end when;
-*/
-
-
-when sample(0,sampleTime) then
-  if startingPos == -1 then
-  startingPos := positionReading;
-  end if;
-
-  if time == 0.0  then
-    speed := 0;
-  elseif  time < deltaAcc then
-    speed := min(exp( (-1 +  time/deltaAcc)^2/( (-1 +  time/deltaAcc)^2 -1  ) ),1);
-  elseif  abs(positionReading-targetPos)<deltaAcc*normDistance or  abs(positionReading-targetPos)<abs(startingPos-targetPos)/2   then
-// if we start the deceleration routine we center the shape function in this time instant
-    if decStarted == false then
-      startDec := time;
-      decStarted := true;
-    end if;
-  
-    speed := min(exp( (-1 +  (time - startDec + deltaAcc )/deltaAcc)^2/( (-1 +  (time - startDec + deltaAcc )/deltaAcc)^2 -1  ) ),1);
-    startSlowing := true;
-  elseif startSlowing then
-    speed := 0;
-  else  
-    speed := 1;
-    startSlowing := false;
-  end if;
-
-end when;
-equation
-internalB = 1;
-internalM = speed / radius;
-connect(motorControl,internalM);
-connect(brakingOutput,internalB);
-
-annotation(
-    Diagram,
-Icon(graphics = {Rectangle(fillColor = {255, 255, 255}, fillPattern = FillPattern.Solid, extent = {{-100, 100}, {100, -100}}), Text(origin = {0, -90}, textColor = {0, 0, 255}, extent = {{-82, 12}, {82, -12}}, textString = "%name"), Line(origin = {22.6154, -11.7692}, points = {{-64, 11}, {52, 11}}), Text(origin = {61, 64}, extent = {{-27, 16}, {27, -16}}, textString = "brake"), Text(origin = {71, -53}, extent = {{-23, 19}, {23, -19}}, textString = "motor"), Text(origin = {-57, 54}, extent = {{-37, 12}, {37, -12}}, textString = "position"), Line(origin = {19.9869, -4.09}, points = {{-41.9117, -18.9117}, {-21.9117, -14.9117}, {-11.9117, -2.91165}, {0.0883484, 11.0883}, {18.0883, 17.0883}, {34.0883, 19.0883}, {42.0883, 19.0883}}, thickness = 1.25, smooth = Smooth.Bezier)}));
-end softStart;
 
   block genF
   Modelica.Blocks.Interfaces.RealOutput y annotation(
@@ -447,5 +315,7 @@ end softStart;
   connect(y, internalM);
     
     
-  end genF;
+  annotation(
+      Icon(graphics = {Ellipse(origin = {1, -3}, extent = {{-99, 77}, {99, -77}})}));
+end genF;
 end Elevator;
