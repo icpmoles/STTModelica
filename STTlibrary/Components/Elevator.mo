@@ -7,30 +7,6 @@ package Elevator
   package Simulation
     extends Modelica.Icons.ExamplesPackage;
 
-    model Simple
-    
-      parameter Real radius = 4;
-      parameter Real cambio = 0.1;
-      elevatorHoistway elevatorAssembly(CabinMass = 2200, hSlack = 1, deltaH = 20, CounterWeightMass = 1500, hStart = 10, pulleyRadius = radius) annotation(
-        Placement(transformation(origin = {44, -16}, extent = {{-46, -46}, {46, 46}})));
-      Motor.ControlledMotor controlledMotor(p = 2, Kt = 10000, R = 0.00005, L = 0.1e-6) annotation(
-        Placement(transformation(origin = {-110, 14}, extent = {{-10, -10}, {10, 10}})));
-    
-      genF genF1(riseT = 2.7, raggio = radius/cambio)  annotation(
-        Placement(transformation(origin = {-176, 14}, extent = {{-10, -10}, {10, 10}})));
-      Modelica.Mechanics.Rotational.Components.IdealGear idealGear(ratio = cambio)  annotation(
-        Placement(transformation(origin = {-40, 12}, extent = {{-10, -10}, {10, 10}})));
-    equation
-    connect(controlledMotor.wref, genF1.y) annotation(
-        Line(points = {{-120, 14}, {-165, 14}}, color = {0, 0, 127}));
-    connect(controlledMotor.flange_b, idealGear.flange_a) annotation(
-        Line(points = {{-98, 14}, {-50, 14}, {-50, 12}}));
-    connect(idealGear.flange_b, elevatorAssembly.pulleyShaft) annotation(
-        Line(points = {{-30, 12}, {40, 12}}));
-      annotation(
-        Diagram);
-    end Simple;
-
     model Feedback
       parameter SI.Length startinPos = 4;
       parameter SI.Length finalPos = 10;
@@ -213,8 +189,7 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
   algorithm
   
   when sample(0,1/1000) then
-   
-  // in accel interval  and "below" the middle point of the travel
+// in accel interval  and "below" the middle point of the travel
     if   time>0 and  ((time < riseT and abs(pos-initialPos) < abs(fullDistance/2)) or currentState == elevatorState.starting) then
     currentState := elevatorState.acceleration;
     end if;
@@ -273,49 +248,4 @@ reading"), Text(origin = {-9, 102}, textColor = {0, 0, 255}, extent = {{-53, 12}
   annotation(
       Icon(graphics = {Rectangle(origin = {-1, -1}, extent = {{-101, 99}, {101, -99}})}));
   end ss2;
-
-  block genF
-  Modelica.Blocks.Interfaces.RealOutput y annotation(
-      Placement(transformation(origin = {106, 0}, extent = {{-10, -10}, {10, 10}}), iconTransformation(origin = {106, 0}, extent = {{-10, -10}, {10, 10}})));
-  discrete Real s;
-  parameter Real raggio;
-  parameter Real cambio;
-  parameter Real riseT = 2;
-  parameter Real startDec = 9 -riseT;
-  
-  parameter Real setP = 19;
-  discrete Real a;
-  
-  protected
-    Modelica.Blocks.Interfaces.RealInput internalM;
-  algorithm
-  
-  when sample(0,1/100) then
-    s := time;
-    if time == 0.0  then
-    s := 0;
-    elseif  time < riseT then
-    s := min(exp( (-1 +  time/riseT)^2/( (-1 +  time/riseT)^2 -1  ) ),1);
-    elseif  time > startDec and time < 9 then
-    s := min(exp( (-1 +  (time - startDec + riseT )/riseT)^2/( (-1 +  (time - startDec + riseT )/riseT)^2 -1  ) ),1);
-    a := 1;
-    elseif a > 0 then
-   
-    s := 0;
-    else  // cruising
-    s := 1;
-    a := 0;
-    end if;
-  
-  end when;
-   
-  equation
-  
-  internalM = s / raggio;
-  connect(y, internalM);
-    
-    
-  annotation(
-      Icon(graphics = {Ellipse(origin = {1, -3}, extent = {{-99, 77}, {99, -77}})}));
-end genF;
 end Elevator;
